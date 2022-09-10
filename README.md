@@ -33,8 +33,8 @@ The console version takes a maximum "depth" (folder-in-folder) as
 a second optional parameter.
 
 The gui version is intended to work with the included Explorer shell 
-extension which starts the app with the selected folder. Multiple  
-or file selection is ignored. The folder crawling process starts in a
+extension which starts the app with the selected folder. Multiple or 
+file selection is ignored. The folder crawling process starts in a
 separate thread and works reasonably fast. If so desired, the process
 can be interrupted. The resulting list can be sorted ascending or
 descending. 
