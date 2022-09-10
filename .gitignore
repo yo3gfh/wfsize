@@ -1,0 +1,15 @@
+output
+setup
+*.exe
+*.dll
+*.obj
+*.res
+*.ppx
+*.tag
+*.bak
+*.ini
+*.map
+*.txt
+*.cmd
+*.bat
+
