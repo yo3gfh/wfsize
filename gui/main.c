@@ -106,7 +106,7 @@ BOOL MainDLG_OnNOTIFY ( HWND hWnd, WPARAM wParam, LPARAM lParam );
 
 HANDLE      ghInstance;
 HWND        ghList;                     // listview hwnd
-WCHAR       grootDir[2048];             // passed from cmdline
+WCHAR       grootDir[1024];             // passed from cmdline
 UINT        gTid;                       // worker thread id
 UINT_PTR    gThandle;                   // worker thread handle
 BOOL        gThreadWorking = FALSE;     // flag for the worker thread
@@ -840,7 +840,7 @@ BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 /*--------------------------------------------------------------------------*/
 {
     THREAD_DATA     * ptd;
-    WCHAR           f[128];
+    WCHAR           f[1024];
     WCHAR           s[128];
     UINT_PTR        index;
 
@@ -898,7 +898,7 @@ BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 BOOL MainDLG_OnENDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 /*--------------------------------------------------------------------------*/
 {
-    WCHAR           f[1280];
+    WCHAR           f[1024];
     WCHAR           s[128];
     THREAD_DATA     * ptd;
     SYSTEMTIME      st_stop, st_result;
