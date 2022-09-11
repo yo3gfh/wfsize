@@ -614,6 +614,16 @@ BOOL CALLBACK EnumChildProc ( HWND hwndChild, LPARAM lParam )
 
     switch ( idChild )
     {
+        // top status label
+        case IDC_FLABEL:
+            newWidth = rcParent->right - (8+70);
+            newHeight = 50;
+
+            MoveWindow ( hwndChild, 70, 8, newWidth, newHeight, TRUE );
+            ShowWindow ( hwndChild, SW_SHOW );
+            break;
+
+        // break op. button
         case IDC_BREAKOP:
             newLeft = rcParent->right - (120 + BNWIDTH);
             newTop = rcParent->bottom - (13 + BNHEIGHT);
@@ -624,6 +634,7 @@ BOOL CALLBACK EnumChildProc ( HWND hwndChild, LPARAM lParam )
             ShowWindow ( hwndChild, SW_SHOW );
             break;
 
+        // close btn.
         case IDOK:
             newLeft = rcParent->right - (13 + BNWIDTH);
             newTop = rcParent->bottom - (13 + BNHEIGHT);
@@ -634,6 +645,7 @@ BOOL CALLBACK EnumChildProc ( HWND hwndChild, LPARAM lParam )
             ShowWindow ( hwndChild, SW_SHOW );
             break;
 
+        // listview
         case IDC_FLIST:
             newWidth = rcParent->right - (2*8);
             newHeight = rcParent->bottom - (65+50);
