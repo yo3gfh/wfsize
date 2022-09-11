@@ -6,3 +6,4 @@
 *.hpp diff
 *.def diff
 *.txt diff
+*.manifest
