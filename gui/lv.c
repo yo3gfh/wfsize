@@ -327,7 +327,7 @@ void LVDeleteSelection ( HWND hList )
 void LVSelectAll ( HWND hList )
 /*--------------------------------------------------------------------------*/
 {
-    LVITEM  item;
+    LVITEMW  item;
 
     item.stateMask  = LVIS_SELECTED;
     item.state      = LVIS_SELECTED;
@@ -349,7 +349,7 @@ void LVSelectAll ( HWND hList )
 void LVSelectItem ( HWND hList, int index )
 /*--------------------------------------------------------------------------*/
 {
-    LVITEM  item;
+    LVITEMW  item;
 
     item.stateMask  = LVIS_SELECTED | LVIS_FOCUSED;
     item.state      = LVIS_SELECTED | LVIS_FOCUSED;
@@ -372,8 +372,8 @@ void LVSelectItem ( HWND hList, int index )
 BOOL LVSetHeaderSortImg ( HWND hList, int index, LV_ARROW lvArrow )
 /*--------------------------------------------------------------------------*/
 {
-    HWND    hHeader;
-    HDITEM  hdrItem;
+    HWND        hHeader;
+    HDITEMW     hdrItem;
 
     hHeader = ListView_GetHeader ( hList );
 
@@ -422,7 +422,7 @@ BOOL LVSetHeaderSortImg ( HWND hList, int index, LV_ARROW lvArrow )
 void LVFocusItem ( HWND hList, int index )
 /*--------------------------------------------------------------------------*/
 {
-    LVITEM  item;
+    LVITEMW  item;
 
     item.stateMask  = LVIS_FOCUSED;
     item.state      = LVIS_FOCUSED;
@@ -444,7 +444,7 @@ void LVFocusItem ( HWND hList, int index )
 void LVUnselectItem ( HWND hList, int index )
 /*--------------------------------------------------------------------------*/
 {
-    LVITEM  item;
+    LVITEMW  item;
 
     item.stateMask  =  LVIS_SELECTED;
     item.state      &= ~LVIS_SELECTED;
