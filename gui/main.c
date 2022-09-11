@@ -1,5 +1,5 @@
 /*
-    WFSIZE, a small folder/subfolder size Windows app 
+    WFSIZE, a small folder/subfolder size calculator for Windows  
     -------------------------------------------------------------------
     Copyright (c) 2022 Adrian Petrila, YO3GFH
     
