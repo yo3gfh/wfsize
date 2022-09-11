@@ -279,16 +279,6 @@ INT_PTR CALLBACK MainDlgProc ( HWND hwndDlg, UINT uMsg,
 
             return TRUE;
 
-        // a bit of a hack... use WM_PRINTCLIENT to scroll list into
-        // view when un-maximizing (restoring) window
-        case WM_PRINTCLIENT:
-
-            if ( !gThreadWorking )
-                if ( lParam & PRF_CLIENT )
-                    LVEnsureVisible ( ghList, LVGetSelIndex ( ghList ) );
-
-            break;
-
         // process WM_SIZING in order to restrict window resize
         case WM_SIZING:
             MainDLG_OnSIZING ( hwndDlg, wParam, lParam );
@@ -812,12 +802,11 @@ BOOL MainDLG_OnSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
     GetClientRect ( hWnd, &r );
     EnumChildWindows ( hWnd, EnumChildProc, (LPARAM)&r );
 
-    // force buttins to redraw
-    RedrawWindow ( GetDlgItem ( hWnd, IDC_BREAKOP ), NULL, NULL, 
-        RDW_ERASE|RDW_INVALIDATE );
+    RedrawWindow ( GetDlgItem ( hWnd, IDC_BREAKOP ), 
+        NULL, NULL, RDW_ERASE|RDW_INVALIDATE );
 
-    RedrawWindow ( GetDlgItem ( hWnd, IDOK ), NULL, NULL, 
-        RDW_ERASE|RDW_INVALIDATE );
+    RedrawWindow ( GetDlgItem ( hWnd, IDOK ), 
+        NULL, NULL, RDW_ERASE|RDW_INVALIDATE );
 
     return TRUE;
 }
