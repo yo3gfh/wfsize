@@ -91,8 +91,10 @@ BOOL CALLBACK EnumChildProc ( HWND hwndChild, LPARAM lParam );
 int CALLBACK CompareListItems
 ( LPARAM lParam1, LPARAM lParam2, LPARAM lParamSort );
 
-BOOL MainDLG_OnCommand ( HWND hWnd, WPARAM wParam, LPARAM lParam );
-BOOL MainDLG_OnSizing ( HWND hWnd, WPARAM wParam, LPARAM lParam );
+// message handlers
+BOOL MainDLG_OnCOMMAND ( HWND hWnd, WPARAM wParam, LPARAM lParam );
+BOOL MainDLG_OnSIZING ( HWND hWnd, WPARAM wParam, LPARAM lParam );
+BOOL MainDLG_OnSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam );
 BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam );
 BOOL MainDLG_OnENDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam );
 BOOL MainDLG_OnINITDIALOG ( HWND hWnd, WPARAM wParam, LPARAM lParam );
@@ -120,6 +122,8 @@ __int64     * gfSizes;                  // pointer to int64 table that
                                         // this table are stored in the  
                                         // coresponding list items data
                                         // struct
+
+SYSTEMTIME  gTimeStart;                 // for calculating elapsed time
 
 /*-@@+@@--------------------------------------------------------------------*/
 //       Function: wWinMain 
@@ -237,8 +241,6 @@ INT_PTR CALLBACK MainDlgProc ( HWND hwndDlg, UINT uMsg,
     WPARAM wParam, LPARAM lParam )
 /*--------------------------------------------------------------------------*/
 {
-    RECT    r;
-
     switch ( uMsg )
     {
         // pass WM_NOTIFY for further processing (column header click?)
@@ -266,8 +268,7 @@ INT_PTR CALLBACK MainDlgProc ( HWND hwndDlg, UINT uMsg,
 
         // process WM_SIZE in order to resize/move all child controls
         case WM_SIZE:
-            GetClientRect ( hwndDlg, &r );
-            EnumChildWindows ( hwndDlg, EnumChildProc, (LPARAM)&r );
+            MainDLG_OnSIZE ( hwndDlg, wParam, lParam );
             return TRUE;
 
         // finished resizing, scroll list into view
@@ -290,11 +291,11 @@ INT_PTR CALLBACK MainDlgProc ( HWND hwndDlg, UINT uMsg,
 
         // process WM_SIZING in order to restrict window resize
         case WM_SIZING:
-            MainDLG_OnSizing ( hwndDlg, wParam, lParam );
+            MainDLG_OnSIZING ( hwndDlg, wParam, lParam );
             return TRUE;
 
         case WM_COMMAND:
-            MainDLG_OnCommand ( hwndDlg, wParam, lParam );
+            MainDLG_OnCOMMAND ( hwndDlg, wParam, lParam );
             break;
 
         case WM_DESTROY:
@@ -659,7 +660,7 @@ BOOL CALLBACK EnumChildProc ( HWND hwndChild, LPARAM lParam )
 }
 
 /*-@@+@@--------------------------------------------------------------------*/
-//       Function: MainDLG_OnCommand 
+//       Function: MainDLG_OnCOMMAND 
 /*--------------------------------------------------------------------------*/
 //           Type: BOOL 
 //    Param.    1: HWND hWnd     : 
@@ -670,7 +671,7 @@ BOOL CALLBACK EnumChildProc ( HWND hwndChild, LPARAM lParam )
 //           DATE: 10.09.2022
 //    DESCRIPTION: WM_COMMAND handler for our dialog
 /*--------------------------------------------------------------------@@-@@-*/
-BOOL MainDLG_OnCommand ( HWND hWnd, WPARAM wParam, LPARAM lParam )
+BOOL MainDLG_OnCOMMAND ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 /*--------------------------------------------------------------------------*/
 {
     switch ( GET_WM_COMMAND_ID(wParam, lParam) )
@@ -707,7 +708,7 @@ BOOL MainDLG_OnCommand ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 }
 
 /*-@@+@@--------------------------------------------------------------------*/
-//       Function: MainDLG_OnSizing 
+//       Function: MainDLG_OnSIZING 
 /*--------------------------------------------------------------------------*/
 //           Type: BOOL 
 //    Param.    1: HWND hWnd     : 
@@ -720,7 +721,7 @@ BOOL MainDLG_OnCommand ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 //                 the window with the mouse. Used for restricting the 
 //                 min. accepted size for the window. 
 /*--------------------------------------------------------------------@@-@@-*/
-BOOL MainDLG_OnSizing ( HWND hWnd, WPARAM wParam, LPARAM lParam )
+BOOL MainDLG_OnSIZING ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 /*--------------------------------------------------------------------------*/
 {
     RECT * wr;
@@ -790,6 +791,38 @@ BOOL MainDLG_OnSizing ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 }
 
 /*-@@+@@--------------------------------------------------------------------*/
+//       Function: MainDLG_OnSIZE 
+/*--------------------------------------------------------------------------*/
+//           Type: BOOL 
+//    Param.    1: HWND hWnd     : 
+//    Param.    2: WPARAM wParam : 
+//    Param.    3: LPARAM lParam : 
+/*--------------------------------------------------------------------------*/
+//         AUTHOR: Adrian Petrila, YO3GFH
+//           DATE: 11.09.2022
+//    DESCRIPTION: WM_SIZE message handler for our dlg
+/*--------------------------------------------------------------------@@-@@-*/
+BOOL MainDLG_OnSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
+/*--------------------------------------------------------------------------*/
+{
+    RECT    r;
+
+    // retrieve window coords and visit every children
+    // moving them as needed
+    GetClientRect ( hWnd, &r );
+    EnumChildWindows ( hWnd, EnumChildProc, (LPARAM)&r );
+
+    // force buttins to redraw
+    RedrawWindow ( GetDlgItem ( hWnd, IDC_BREAKOP ), NULL, NULL, 
+        RDW_ERASE|RDW_INVALIDATE );
+
+    RedrawWindow ( GetDlgItem ( hWnd, IDOK ), NULL, NULL, 
+        RDW_ERASE|RDW_INVALIDATE );
+
+    return TRUE;
+}
+
+/*-@@+@@--------------------------------------------------------------------*/
 //       Function: MainDLG_OnUPDFSIZE 
 /*--------------------------------------------------------------------------*/
 //           Type: BOOL 
@@ -837,9 +870,8 @@ BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
         // into view
         if ( ptd->subfolders % 256 == 0 )
         {
-            StringCchPrintfW ( f, ARRAYSIZE(f), L"Folder properties"
-                " for %ls (%zu subfolders processed)", 
-                    grootDir, ptd->subfolders );
+            StringCchPrintfW ( f, ARRAYSIZE(f), L"%ls (%zu subfolders "
+                "processed)", grootDir, ptd->subfolders );
 
             SetDlgItemTextW ( hWnd, IDC_FLABEL, f );
             LVEnsureVisible ( ptd->hList, index );
@@ -868,6 +900,10 @@ BOOL MainDLG_OnENDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
     WCHAR           f[1280];
     WCHAR           s[128];
     THREAD_DATA     * ptd;
+    SYSTEMTIME      st_stop, st_result;
+    FILETIME        ft_start, ft_stop, fl_result;
+    ULARGE_INTEGER  ul_start, ul_stop, ul_result;
+    WORD            hr, min, sec, msec;
 
     gThreadWorking = FALSE;
 
@@ -882,6 +918,28 @@ BOOL MainDLG_OnENDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
     // scroll list into view, update totals and disable panic button :-)
     if ( ptd != NULL )
     {
+        GetLocalTime ( &st_stop );
+
+        SystemTimeToFileTime ( &gTimeStart, &ft_start );
+        SystemTimeToFileTime ( &st_stop, &ft_stop );
+
+        ul_stop.u.HighPart = ft_stop.dwHighDateTime;
+        ul_stop.u.LowPart = ft_stop.dwLowDateTime;
+
+        ul_start.u.HighPart = ft_start.dwHighDateTime;
+        ul_start.u.LowPart = ft_start.dwLowDateTime;
+
+        ul_result.QuadPart = ul_stop.QuadPart - ul_start.QuadPart;
+        fl_result.dwHighDateTime = ul_result.u.HighPart;
+        fl_result.dwLowDateTime = ul_result.u.LowPart;
+
+        FileTimeToSystemTime ( &fl_result, &st_result );
+
+        hr   = st_result.wHour;
+        min  = st_result.wMinute;
+        sec  = st_result.wSecond;
+        msec = st_result.wMilliseconds;
+
         LVEnsureVisible ( ptd->hList, LVGetCount ( ptd->hList ) - 1 );
         LVSelectItem ( ptd->hList, LVGetCount ( ptd->hList ) - 1 );
         SetFocus ( ptd->hList );
@@ -892,9 +950,9 @@ BOOL MainDLG_OnENDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
         GetNumberFormatW ( LOCALE_SYSTEM_DEFAULT, 
             LOCALE_NOUSEROVERRIDE, f, NULL, s, ARRAYSIZE(s) );
 
-        StringCchPrintfW ( f, ARRAYSIZE(f), L"Folder properties for %ls "
-            "(%zu subfolders processed), %ls KBytes total size", grootDir, 
-                ptd->subfolders, s );
+        StringCchPrintfW ( f, ARRAYSIZE(f), L"%ls (%zu subfolders,"
+            " %02uh %02um %02us %03ums), %ls KBytes total size", grootDir, 
+                ptd->subfolders, hr, min, sec, msec, s );
 
         SetDlgItemTextW ( hWnd, IDC_FLABEL, f );
     }
@@ -931,7 +989,7 @@ BOOL MainDLG_OnINITDIALOG ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 
         LVInsertColumn ( ghList, 0, L"Full path to folder", 
             LVCFMT_LEFT, 750, -1 );
-        LVInsertColumn ( ghList, 1, L"Folder size (in KBytes)", 
+        LVInsertColumn ( ghList, 1, L"Folder size (KBytes)", 
             LVCFMT_LEFT, 130, -1 );
 
         if ( grootDir[0] != L'\0' )
@@ -944,6 +1002,9 @@ BOOL MainDLG_OnINITDIALOG ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 
             SendMessage ( ghList, LVM_SETITEMCOUNT, LV_DEFAULT_CAPACITY, 0 );
             EnableWindow ( GetDlgItem ( hWnd, IDC_BREAKOP ), TRUE );
+
+            // punch the clock
+            GetLocalTime ( &gTimeStart );
 
             // start the working thread
             gThandle = _beginthreadex ( NULL, 0, 

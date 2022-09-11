@@ -17,11 +17,11 @@ FONT 8, "MS Shell Dlg", 0, 0, 1
   CONTROL "&Break operation", IDC_BREAKOP, "Button", WS_TABSTOP, 472, 202, 65, 14
   CONTROL "&Close", IDOK, "Button", WS_TABSTOP, 541, 202, 65, 14
   CONTROL IDR_ICO_MAIN, 4002, "Static", SS_ICON|SS_CENTERIMAGE, 8, 3, 32, 32
-  CONTROL "Folder properties for", IDC_FLABEL, "Static", WS_GROUP, 47, 15, 560, 8
+  CONTROL "Folder properties for", IDC_FLABEL, "Static", SS_CENTERIMAGE|SS_PATHELLIPSIS|WS_GROUP, 47, 7, 559, 26
 }
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 1,1,0,1
+FILEVERSION 1, 1, 0, 22
 PRODUCTVERSION 1,1,0,1
 FILEFLAGSMASK 0x3F
 FILEFLAGS 0x0
@@ -35,7 +35,7 @@ FILESUBTYPE VFT2_UNKNOWN
     {
       VALUE "CompanyName", "Home\0"
       VALUE "FileDescription", "Folder size app\0"
-      VALUE "FileVersion", "1.1.0.1\0"
+VALUE "FileVersion", "1.1.0.22\0"
       VALUE "InternalName", "WFSIZE\0"
       VALUE "LegalCopyright", "(c) 2022 Adrian Petrila, YO3GFH\0"
       VALUE "OriginalFilename", "wfsize.exe\0"
