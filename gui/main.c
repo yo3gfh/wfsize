@@ -41,7 +41,9 @@
     can be interrupted. The resulting list can be sorted ascending or
     descending. 
 
-    Nothing fancy, but gets the job done in under 100 KBytes :-)
+    Nothing fancy, but gets the job done reasonably fast,
+    in under 100 KBytes :-)
+    
     You may build as 32 or 64 bit, but UNICODE is mandatory. 
 
     It's taylored to my own needs, modify it to suit your own. 
