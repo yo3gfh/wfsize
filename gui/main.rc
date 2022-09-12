@@ -21,7 +21,7 @@ FONT 8, "MS Shell Dlg", 0, 0, 1
 }
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 1, 1, 0, 44
+FILEVERSION 1, 1, 0, 51
 PRODUCTVERSION 1,1,0,1
 FILEFLAGSMASK 0x3F
 FILEFLAGS 0x0
@@ -35,7 +35,7 @@ FILESUBTYPE VFT2_UNKNOWN
     {
       VALUE "CompanyName", "Home\0"
       VALUE "FileDescription", "Folder size app\0"
-VALUE "FileVersion", "1.1.0.44\0"
+VALUE "FileVersion", "1.1.0.51\0"
       VALUE "InternalName", "WFSIZE\0"
       VALUE "LegalCopyright", "(c) 2022 Adrian Petrila, YO3GFH\0"
       VALUE "OriginalFilename", "wfsize.exe\0"

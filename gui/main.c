@@ -952,7 +952,7 @@ BOOL MainDLG_OnENDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
             LOCALE_NOUSEROVERRIDE, f, NULL, s, ARRAYSIZE(s) );
 
         StringCchPrintfW ( f, ARRAYSIZE(f), L"%ls (%zu subfolders,"
-            " %02uh %02um %02us %03ums), %ls KBytes total size", grootDir, 
+            " %02uh:%02um:%02us:%03ums), %ls KBytes total size", grootDir, 
                 ptd->subfolders, hr, min, sec, msec, s );
 
         SetDlgItemTextW ( hWnd, IDC_FLABEL, f );
