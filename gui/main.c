@@ -73,7 +73,8 @@ typedef struct _fsize_thread_data
     HWND        hParent;    // dlg hwnd
     WCHAR       * fpath;    // root path
     WCHAR       * crtDir;   // current path
-    __int64     size;       // crt. folder size 
+    __int64     size;       // crt. folder size
+    __int64     * fsizes;   // always holds the correct fsize table address
     UINT        errcode;    // unused
     UINT_PTR    subfolders; // how many subfolders processed          
 } THREAD_DATA;
@@ -115,6 +116,7 @@ BOOL        gAscending = TRUE;          // for sorting
 THREAD_DATA gTtd;                       // structure to pass data to and
                                         // from the worker thread
 
+size_t      gfSizesCapacity;            // will hold gfSizes current capacity
 __int64     * gfSizes;                  // pointer to int64 table that 
                                         // will hold ALL processed 
                                         // folders (gTtd.crtDir) size;
@@ -195,15 +197,17 @@ int APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance,
         return 0;
     }
 
-    // alocate the whole mem for folder size data - about 8 million folders,
-    // 8 bytes each, about 64 megs of RAM, not very ellegant
-    // but what's 64 Megs today
-    gfSizes = alloc_and_zero_mem (ALIGN_4K(MAX_ITEMS*sizeof(__int64)));
+    // make initial capacity equal to list capacity, aligned
+    // to 4k boundaries
+
+    gfSizesCapacity = ALIGN_4K(LV_DEFAULT_CAPACITY);
+
+    gfSizes = alloc_and_zero_mem (gfSizesCapacity*sizeof(__int64));
 
     if ( gfSizes == NULL )
     {
-        MessageBoxW ( NULL, L"Unable to allocate 64 MB for folder"
-            " size data!", L"WFSIZE", 
+        MessageBoxW ( NULL, L"Unable to allocate memory for folders"
+            " size table!", L"WFsize 1.1", 
                 MB_OK | MB_ICONEXCLAMATION );
 
         if ( cmdLine != NULL )
@@ -352,6 +356,7 @@ __int64 FolderSize ( const WCHAR * fpath, THREAD_DATA * ptd )
     WIN32_FIND_DATAW    ffData;
     HANDLE              hFind;
     __int64             size;
+    __int64             * tmpptr;
     static UINT_PTR     depth;
     static UINT_PTR     subfolders;
     WCHAR               buf[1024];
@@ -414,9 +419,21 @@ __int64 FolderSize ( const WCHAR * fpath, THREAD_DATA * ptd )
     if ( PeekMessage ( &msg, (HWND)-1, WM_APP+100, WM_APP+200, PM_REMOVE ) )
         depth = MAX_DEPTH+10;
 
-    // unlikely event that we've reached MAX_ITEMS
-    if ( subfolders == MAX_ITEMS-2 )
-        depth = MAX_DEPTH+10;
+    // see if we reached the end of our current table, calculate the
+    // new size alligned to 4k and realloc accordingly
+    if ( subfolders >= gfSizesCapacity - 1 )
+    {
+        gfSizesCapacity += ALIGN_4K (( LV_DEFAULT_CAPACITY + 
+                (subfolders - gfSizesCapacity - 1)));
+
+        tmpptr = realloc_and_zero_mem ( ptd->fsizes, 
+            gfSizesCapacity*sizeof (__int64));
+
+        if ( tmpptr != NULL )
+            ptd->fsizes = tmpptr;
+        else
+            depth = MAX_DEPTH+10; // can't go further so force eject
+    }
 
     // put results in our structure...
     ptd->size       = size;
@@ -857,13 +874,15 @@ BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 
         index = LVGetCount ( ptd->hList );
 
-        // add result to the list and store pointers to folder size 
+        // add result to the list and store index to folder size 
         // in the list as lParam member of LVITEM struct so we can sort 
-        // the list at a later time. 
+        // the list at a later time. NOTE: don't store pointers!
+        // this mem will be realloc'd and any ptr will be invalid!
+        gfSizes = ptd->fsizes;
         gfSizes[index] = ptd->size;
     
         LVInsertItemEx ( ptd->hList, index, -1, ptd->crtDir, 
-            (LPARAM)&gfSizes[index] );
+            (LPARAM)index );
 
         LVSetItemText ( ptd->hList, index, 1, s );
 
@@ -998,6 +1017,7 @@ BOOL MainDLG_OnINITDIALOG ( HWND hWnd, WPARAM wParam, LPARAM lParam )
             gTtd.fpath      = grootDir;
             gTtd.hList      = ghList;
             gTtd.hParent    = hWnd;
+            gTtd.fsizes     = gfSizes;
             
             gThreadWorking  = TRUE;
 
@@ -1090,11 +1110,8 @@ int CALLBACK CompareListItems
 {
     __int64 i1, i2;
 
-    if ( lParam1 == 0 || lParam2 == 0 )
-        return 0;
-
-    i1 = *((__int64 *)lParam1);
-    i2 = *((__int64 *)lParam2);
+    i1 = gfSizes[lParam1];
+    i2 = gfSizes[lParam2];
 
     if ( i1 > i2 )
         return (lParamSort == TRUE) ? 1 : -1;
