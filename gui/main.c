@@ -29,7 +29,8 @@
     
     It's designed to take a single folder path from command line and
     go recursively from there to calculate total and subfolder size,
-    presenting a list with all of them.
+    presenting a list with all of them. If no start folder is specified,
+    it uses the folder it was executed from.
 
     The console version takes a maximum "depth" (folder-in-folder) as
     a second optional parameter.
@@ -103,6 +104,7 @@ BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam );
 BOOL MainDLG_OnENDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam );
 BOOL MainDLG_OnINITDIALOG ( HWND hWnd, WPARAM wParam, LPARAM lParam );
 BOOL MainDLG_OnNOTIFY ( HWND hWnd, WPARAM wParam, LPARAM lParam );
+BOOL PathFromModule ( WCHAR * buf, DWORD cchDest );
 
 //
 // globals
@@ -132,11 +134,14 @@ SYSTEMTIME  gTimeStart;                 // for calculating elapsed time
 
 // some constants
 
-const WCHAR * opn_filter = L"CSV files (*.csv)\0*.csv\0"
+const WCHAR * opn_filter  = L"CSV files (*.csv)\0*.csv\0"
                             "All Files (*.*)\0*.*\0";
 
-const WCHAR * opn_defext = L"csv";
-const WCHAR * sav_title  = L"Save folder list to CSV...";
+const WCHAR * opn_defext  = L"csv";
+const WCHAR * sav_title   = L"Save folder list to CSV...";
+const WCHAR * app_name    = L"WFSize 1.1";
+const WCHAR * app_name_ex = L"WFsize v1.1 - Windows folder size calculator,"
+                            L" copyright (c) 2022 Adrian Petrila, YO3GFH";
 
 /*-@@+@@--------------------------------------------------------------------*/
 //       Function: wWinMain 
@@ -187,6 +192,7 @@ int APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
     cmdLine             = FILE_CommandLineToArgv ( GetCommandLineW(), &argc );
 
+    // do we have something to do from cmd line?
     if ( argc >= 2 && cmdLine != NULL )
     {
         StringCchCopyW ( grootDir, ARRAYSIZE(grootDir), cmdLine[1] );
@@ -196,16 +202,20 @@ int APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance,
         if ( grootDir[idx-1] == L'\\' )
             grootDir[idx-1] = L'\0';
     }
+    // no, just use the crt dir
     else
     {
-        MessageBoxW ( NULL, L"Please pass a folder path to wfsize.exe"
-            " through the command line", L"WFsize", 
-                MB_OK | MB_ICONEXCLAMATION );
+        if ( !PathFromModule ( grootDir, ARRAYSIZE(grootDir)) )
+        {
+            MessageBoxW ( NULL, L"Please pass a folder path to wfsize.exe"
+                " through the command line", app_name, 
+                    MB_OK | MB_ICONEXCLAMATION );
 
-        if ( cmdLine != NULL )
-            GlobalFree ( cmdLine );
+            if ( cmdLine != NULL )
+                GlobalFree ( cmdLine );
 
-        return 0;
+            return 0;
+        }
     }
 
     // make initial capacity equal to list capacity, aligned
@@ -218,7 +228,7 @@ int APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance,
     if ( gfSizes == NULL )
     {
         MessageBoxW ( NULL, L"Unable to allocate memory for folders"
-            " size table!", L"WFsize 1.1", 
+            " size table!", app_name, 
                 MB_OK | MB_ICONEXCLAMATION );
 
         if ( cmdLine != NULL )
@@ -273,7 +283,7 @@ INT_PTR CALLBACK MainDlgProc ( HWND hwndDlg, UINT uMsg,
             if ( !MainDLG_OnUPDFSIZE ( hwndDlg, wParam, lParam ) )
             {
                 MessageBoxW ( hwndDlg, 
-                    L"Error adding items to list", L"WFsize", 
+                    L"Error adding items to list", app_name, 
                         MB_OK|MB_ICONERROR );
 
                 // signal that we're not in the mood anymore
@@ -729,7 +739,7 @@ BOOL MainDLG_OnCOMMAND ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 
             if ( !SaveFolderListToCSV ( hWnd ) )
                 MessageBoxW ( hWnd, L"Unable to save folder "
-                    "list to CSV file!", L"WFSize", MB_OK|MB_ICONEXCLAMATION);
+                    "list to CSV file!", app_name, MB_OK|MB_ICONEXCLAMATION);
 
             break;
 
@@ -1044,6 +1054,8 @@ BOOL MainDLG_OnENDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 BOOL MainDLG_OnINITDIALOG ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 /*--------------------------------------------------------------------------*/
 {
+    SetWindowTextW ( hWnd, app_name_ex );
+
     ghList = GetDlgItem ( hWnd, IDC_FLIST );
 
     if ( ghList != NULL )
@@ -1098,8 +1110,10 @@ BOOL MainDLG_OnINITDIALOG ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 BOOL MainDLG_OnNOTIFY ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 /*--------------------------------------------------------------------------*/
 {
-    NMHDR   * lpnm;
-    HWND    hList;
+    NMHDR           * lpnm;
+    NMLVKEYDOWN     * lpvk;
+    HWND            hList;
+    static BOOL     ctrl_pressed, s_pressed;
 
     lpnm = (NMHDR *)lParam;
 
@@ -1132,8 +1146,39 @@ BOOL MainDLG_OnNOTIFY ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 
             // mouse right-clicky
             case NM_RCLICK:
-                //MessageBoxW ( hWnd, L"R click click", L"Mouse", MB_OK );
                 ContextMenu ( hWnd, IDR_LPOP );
+                break;
+
+            // a crude ctrl+s simulation
+            case LVN_KEYDOWN:
+                lpvk = (NMLVKEYDOWN *)lParam;
+                switch ( lpvk->wVKey )
+                {
+                    case VK_CONTROL:
+                        ctrl_pressed = TRUE;
+                        break;
+
+                    case VK_S:
+                        if ( ctrl_pressed )
+                            s_pressed = TRUE;
+                        break;
+
+                    default:
+                        ctrl_pressed = FALSE;
+                        s_pressed = FALSE;
+                        break;
+                } 
+
+                if ( ctrl_pressed && s_pressed )
+                {
+                    if ( !SaveFolderListToCSV ( hWnd ) )
+                        MessageBoxW ( hWnd, L"Unable to save folder "
+                            "list to CSV file!", app_name, 
+                                MB_OK|MB_ICONEXCLAMATION);
+                    
+                    ctrl_pressed = FALSE;
+                    s_pressed = FALSE;
+                }
                 break;
 
             default:
@@ -1334,3 +1379,42 @@ BOOL LVItemsToCSV ( HWND hList, const WCHAR * fname )
     return result;
 }
 
+
+/*-@@+@@--------------------------------------------------------------------*/
+//       Function: PathFromModule 
+/*--------------------------------------------------------------------------*/
+//           Type: BOOL 
+//    Param.    1: WCHAR * buf   : buffer to hold the result
+//    Param.    2: DWORD cchDest : buf size, in (w)chars
+/*--------------------------------------------------------------------------*/
+//         AUTHOR: Adrian Petrila, YO3GFH
+//           DATE: 16.09.2022
+//    DESCRIPTION: copies the path from which the program was started in the
+//                 buffer buf. Returns TRUE on success, FALSE on failure
+/*--------------------------------------------------------------------@@-@@-*/
+BOOL PathFromModule ( WCHAR * buf, DWORD cchDest )
+/*--------------------------------------------------------------------------*/
+{
+    HMODULE     hMod;
+    DWORD       len;
+
+    if ( buf == NULL || cchDest == 0 )
+        return FALSE;
+
+    hMod    = GetModuleHandleW ( NULL );
+    len     = GetModuleFileNameW ( hMod, buf, cchDest );
+
+    if ( len == 0 )
+    {
+        buf[0] = L'\0';
+        return FALSE;
+    }
+
+    // hit the first path separator (from end to start)
+    while ( buf[len] != L'\\' )
+        len--;
+    // and end the string here
+    buf[len] = L'\0';
+
+    return TRUE;
+}
