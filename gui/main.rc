@@ -21,7 +21,7 @@ FONT 8, "MS Shell Dlg", 0, 0, 1
 }
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 1, 1, 0, 93
+FILEVERSION 1, 1, 0, 124
 PRODUCTVERSION 1,1,0,1
 FILEFLAGSMASK 0x3F
 FILEFLAGS 0x0
@@ -35,7 +35,7 @@ FILESUBTYPE VFT2_UNKNOWN
     {
       VALUE "CompanyName", "Home\0"
       VALUE "FileDescription", "Folder size app\0"
-VALUE "FileVersion", "1.1.0.93\0"
+VALUE "FileVersion", "1.1.0.124\0"
       VALUE "InternalName", "WFSIZE\0"
       VALUE "LegalCopyright", "(c) 2022 Adrian Petrila, YO3GFH\0"
       VALUE "OriginalFilename", "wfsize.exe\0"
@@ -48,6 +48,15 @@ VALUE "FileVersion", "1.1.0.93\0"
     VALUE "Translation", 0x409, 0x4E4
   }
 }
+
+2001 MENUEX
+{
+  POPUP "Popup1", 0, 0, 0
+  {
+    MENUITEM "&Save folder list to CSV...", 6001, 0, 0
+  }
+}
+
 
 IDR_ICO_MAIN ICON "fsearch.ico"
 

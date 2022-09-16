@@ -38,6 +38,9 @@
 #define IDC_FLIST       4007
 #define IDC_FLABEL      4008
 
+#define IDR_LPOP        2001
+#define IDM_SAVECSV     6001
+
 #define IDR_ICO_MAIN    8001
 
 #endif

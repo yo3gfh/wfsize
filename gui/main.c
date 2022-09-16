@@ -88,6 +88,9 @@ __int64 FolderSize ( const WCHAR * fpath, THREAD_DATA * ptd );
 
 UINT __stdcall Thread_FolderSize ( void * thData );
 BOOL CALLBACK EnumChildProc ( HWND hwndChild, LPARAM lParam );
+BOOL ContextMenu ( HWND hWnd, int menuId );
+BOOL SaveFolderListToCSV ( HWND hWnd );
+BOOL LVItemsToCSV ( HWND hList, const WCHAR * fname);
 
 int CALLBACK CompareListItems
 ( LPARAM lParam1, LPARAM lParam2, LPARAM lParamSort );
@@ -126,6 +129,14 @@ __int64     * gfSizes;                  // pointer to int64 table that
                                         // struct
 
 SYSTEMTIME  gTimeStart;                 // for calculating elapsed time
+
+// some constants
+
+const WCHAR * opn_filter = L"CSV files (*.csv)\0*.csv\0"
+                            "All Files (*.*)\0*.*\0";
+
+const WCHAR * opn_defext = L"csv";
+const WCHAR * sav_title  = L"Save folder list to CSV...";
 
 /*-@@+@@--------------------------------------------------------------------*/
 //       Function: wWinMain 
@@ -188,7 +199,7 @@ int APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance,
     else
     {
         MessageBoxW ( NULL, L"Please pass a folder path to wfsize.exe"
-            " through the command line", L"WFSIZE", 
+            " through the command line", L"WFsize", 
                 MB_OK | MB_ICONEXCLAMATION );
 
         if ( cmdLine != NULL )
@@ -258,7 +269,26 @@ INT_PTR CALLBACK MainDlgProc ( HWND hwndDlg, UINT uMsg,
         // WM_UPDFSIZE is received when the working thread is done
         // with a folder
         case WM_UPDFSIZE:
-            MainDLG_OnUPDFSIZE ( hwndDlg, wParam, lParam );
+
+            if ( !MainDLG_OnUPDFSIZE ( hwndDlg, wParam, lParam ) )
+            {
+                MessageBoxW ( hwndDlg, 
+                    L"Error adding items to list", L"WFsize", 
+                        MB_OK|MB_ICONERROR );
+
+                // signal that we're not in the mood anymore
+                if ( gThreadWorking == TRUE )
+                {
+                    gThreadWorking = FALSE;
+
+                    PostThreadMessage ( gTid, WM_ABTFSIZE, 0, 0 );
+                    EnableWindow ( GetDlgItem ( hwndDlg, IDC_BREAKOP ), FALSE);
+                    LVEnsureVisible ( ghList, LVGetCount ( ghList ) - 1 );
+                    LVSelectItem ( ghList, LVGetCount ( ghList ) - 1 );
+                    SetFocus ( ghList );
+                }
+            }
+
             return TRUE;
 
         // WM_ENDFSIZE is received when the whole operation is finished
@@ -695,6 +725,14 @@ BOOL MainDLG_OnCOMMAND ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 {
     switch ( GET_WM_COMMAND_ID(wParam, lParam) )
     {
+        case IDM_SAVECSV:
+
+            if ( !SaveFolderListToCSV ( hWnd ) )
+                MessageBoxW ( hWnd, L"Unable to save folder "
+                    "list to CSV file!", L"WFSize", MB_OK|MB_ICONEXCLAMATION);
+
+            break;
+
         case IDOK:
             EndDialog ( hWnd, TRUE );
             return TRUE;
@@ -879,7 +917,15 @@ BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
         // the list at a later time. NOTE: don't store pointers!
         // this mem will be realloc'd and any ptr will be invalid!
         gfSizes = ptd->fsizes;
-        gfSizes[index] = ptd->size;
+
+        __try
+        {
+            gfSizes[index] = ptd->size;
+        }
+        __except ( EXCEPTION_EXECUTE_HANDLER )
+        {
+            return FALSE; // great booboo happened
+        }
     
         LVInsertItemEx ( ptd->hList, index, -1, ptd->crtDir, 
             (LPARAM)index );
@@ -1063,24 +1109,35 @@ BOOL MainDLG_OnNOTIFY ( HWND hWnd, WPARAM wParam, LPARAM lParam )
     // is it from the list?
     if ( lpnm->idFrom == IDC_FLIST )
     {
-        // is it a column header clicky?
-        if (lpnm->code == LVN_COLUMNCLICK)
+        switch (lpnm->code)
         {
-            hList = lpnm->hwndFrom;
+            // is it a column header clicky?
+            case LVN_COLUMNCLICK:
+                hList = lpnm->hwndFrom;
 
-            // sort list items and set the column header arrow
-            LVSortItems ( hList, gAscending, (LPARAM)CompareListItems );
+                // sort list items and set the column header arrow
+                LVSortItems ( hList, gAscending, (LPARAM)CompareListItems );
 
-            if ( gAscending )
-                LVSetHeaderSortImg ( hList, 1, UP_ARROW );
-            else
-                LVSetHeaderSortImg ( hList, 1, DOWN_ARROW );
+                if ( gAscending )
+                    LVSetHeaderSortImg ( hList, 1, UP_ARROW );
+                else
+                    LVSetHeaderSortImg ( hList, 1, DOWN_ARROW );
 
-            gAscending = !gAscending;
+                gAscending = !gAscending;
 
-            // select first item and scroll into view
-            LVSelectItem ( hList, 0 );
-            LVEnsureVisible ( hList, 0 );
+                // select first item and scroll into view
+                LVSelectItem ( hList, 0 );
+                LVEnsureVisible ( hList, 0 );
+                break;
+
+            // mouse right-clicky
+            case NM_RCLICK:
+                //MessageBoxW ( hWnd, L"R click click", L"Mouse", MB_OK );
+                ContextMenu ( hWnd, IDR_LPOP );
+                break;
+
+            default:
+                break;
         }
     }
 
@@ -1099,8 +1156,8 @@ BOOL MainDLG_OnNOTIFY ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 //         AUTHOR: Adrian Petrila, YO3GFH
 //           DATE: 10.09.2022
 //    DESCRIPTION: callback function called by the LVM_SORTITEMS message.
-//                 Compares what's on LVITEM.lParam pointer previously stored 
-//                 by the list when item was created for two adjacent items.  
+//                 Compares what's on LVITEM.lParam (previously stored 
+//                 by the list when item was created) for two adjacent items.  
 //                 Returns -, + or 0, according to <, > or = relation between
 //                 lParam1 and lParam2.
 /*--------------------------------------------------------------------@@-@@-*/
@@ -1110,8 +1167,15 @@ int CALLBACK CompareListItems
 {
     __int64 i1, i2;
 
-    i1 = gfSizes[lParam1];
-    i2 = gfSizes[lParam2];
+    __try
+    {
+        i1 = gfSizes[lParam1];
+        i2 = gfSizes[lParam2];
+    }
+    __except ( EXCEPTION_EXECUTE_HANDLER )
+    {
+        return 0;
+    }
 
     if ( i1 > i2 )
         return (lParamSort == TRUE) ? 1 : -1;
@@ -1125,3 +1189,148 @@ int CALLBACK CompareListItems
     // "return (lParamSort == TRUE) ? i1 - i2 : i2 - i1;", it WILL return
     // truncated values :-)
 }
+
+/*-@@+@@--------------------------------------------------------------------*/
+//       Function: ContextMenu 
+/*--------------------------------------------------------------------------*/
+//           Type: BOOL 
+//    Param.    1: HWND hWnd  : parent hwnd
+//    Param.    2: int menuId : resource ID of the manu that pops
+/*--------------------------------------------------------------------------*/
+//         AUTHOR: Adrian Petrila, YO3GFH
+//           DATE: 16.09.2022
+//    DESCRIPTION: make a pop!
+/*--------------------------------------------------------------------@@-@@-*/
+BOOL ContextMenu ( HWND hWnd, int menuId )
+/*--------------------------------------------------------------------------*/
+{
+    static HMENU    hPop, hSub;
+    POINT           pt;
+    DWORD           states[2] = { MF_GRAYED, MF_ENABLED };
+    BOOL            state;
+
+    hPop = LoadMenuW ( GetModuleHandleW ( NULL ),
+        MAKEINTRESOURCEW ( menuId ));
+
+    if ( !hPop )
+        return FALSE;
+
+    hSub    = GetSubMenu ( hPop, 0 );
+    state   = ( LVGetCount ( ghList ) != 0 );
+
+    EnableMenuItem ( hSub, IDM_SAVECSV, states[state] );
+    GetCursorPos ( &pt );
+
+    TrackPopupMenuEx ( hSub, 
+        TPM_LEFTALIGN|TPM_LEFTBUTTON|TPM_RIGHTBUTTON, 
+            pt.x, pt.y, hWnd, NULL );
+
+    return TRUE;
+}
+
+/*-@@+@@--------------------------------------------------------------------*/
+//       Function: SaveFolderListToCSV 
+/*--------------------------------------------------------------------------*/
+//           Type: BOOL 
+//    Param.    1: HWND hWnd : parent hwnd
+/*--------------------------------------------------------------------------*/
+//         AUTHOR: Adrian Petrila, YO3GFH
+//           DATE: 16.09.2022
+//    DESCRIPTION: display the Save dialog and call LVItemsToCSV
+/*--------------------------------------------------------------------@@-@@-*/
+BOOL SaveFolderListToCSV ( HWND hWnd )
+/*--------------------------------------------------------------------------*/
+{
+    OPENFILENAMEW   ofn;
+    DWORD           dlgstyle;
+    WCHAR           csvname[MAX_PATH];
+
+    RtlZeroMemory ( &ofn, sizeof ( ofn ) );
+
+    dlgstyle = OFN_EXPLORER|OFN_PATHMUSTEXIST|
+        OFN_HIDEREADONLY|OFN_OVERWRITEPROMPT;
+
+    StringCchCopyW ( csvname, ARRAYSIZE(csvname), L"folderlist" );
+
+    ofn.lStructSize     = sizeof ( ofn );
+    ofn.hInstance       = GetModuleHandleW ( NULL );
+    ofn.hwndOwner       = hWnd;
+    ofn.Flags           = dlgstyle;
+    ofn.lpstrFilter     = opn_filter;
+    ofn.nFilterIndex    = 1;
+    ofn.lpstrFile       = csvname;
+    ofn.nMaxFile        = ARRAYSIZE ( csvname );
+    ofn.lpstrTitle      = sav_title;
+    ofn.lpstrDefExt     = opn_defext;
+    ofn.lpstrInitialDir = grootDir; // would be nice to pass this 
+                                    // as a param, not use a global :-)
+
+    if ( GetSaveFileNameW ( &ofn ) )
+        return LVItemsToCSV ( ghList, ofn.lpstrFile );
+
+    return TRUE;
+}
+
+/*-@@+@@--------------------------------------------------------------------*/
+//       Function: LVItemsToCSV 
+/*--------------------------------------------------------------------------*/
+//           Type: BOOL 
+//    Param.    1: HWND hList          : ListView ctrl. handle
+//    Param.    2: const WCHAR * fname : path to csv file to save to
+/*--------------------------------------------------------------------------*/
+//         AUTHOR: Adrian Petrila, YO3GFH
+//           DATE: 16.09.2022
+//    DESCRIPTION: this saves all the items and the first level of subitems 
+//                 from a listview control into a CSV file that you can open 
+//                 in Excel. 
+/*--------------------------------------------------------------------@@-@@-*/
+BOOL LVItemsToCSV ( HWND hList, const WCHAR * fname )
+/*--------------------------------------------------------------------------*/
+{
+    HANDLE  hFile;
+    size_t  i, items;
+    WCHAR   item[1024];     // holds item text
+    WCHAR   subitem[64];    // holds subitem text
+    WCHAR   s[1280];        // holds a csv line, in unicode
+    CHAR    b[1280];        // holds the ansi version
+    DWORD   towrite, written;
+    BOOL    result = TRUE;
+
+    if ( hList == NULL || fname == NULL )
+        return FALSE;
+
+    items = LVGetCount ( hList );
+
+    if ( items == 0 ) // nothing to do
+        return FALSE;
+
+    hFile = CreateFile ( fname, GENERIC_READ|GENERIC_WRITE,
+        FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, 0, 0 );
+    
+    if ( hFile == INVALID_HANDLE_VALUE )
+        return FALSE;
+
+    for ( i = 0; i < items && i < gfSizesCapacity; i++ )
+    {
+        item[0]         = L'\0';
+        subitem[0]      = L'\0';
+
+        LVGetItemText ( hList, i, 0, item, ARRAYSIZE(item) );
+        LVGetItemText ( hList, i, 1, subitem, ARRAYSIZE(subitem) );
+
+        StringCchPrintfW ( s, ARRAYSIZE(s), L"\"%ls\",\"%ls\"\r\n",
+            item, subitem );
+
+        // make a regular text line 
+        towrite = WideCharToMultiByte ( GetACP(), 0, s, -1, b,
+            ARRAYSIZE(b), NULL, NULL );
+
+        // write to file and accumulate errors, if any :-)
+        result &= WriteFile ( hFile, b, towrite-1, &written, NULL );
+    }
+    
+    CloseHandle ( hFile );
+
+    return result;
+}
+

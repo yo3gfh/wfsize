@@ -469,5 +469,3 @@ BOOL LVEnsureVisible ( HWND hList, int index )
     return (BOOL)SendMessage ( hList, LVM_ENSUREVISIBLE, index, (LPARAM)FALSE);
 }
 
-
-
