@@ -220,7 +220,6 @@ int APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance,
 
     // make initial capacity equal to list capacity, aligned
     // to 4k boundaries
-
     gfSizesCapacity = ALIGN_4K(LV_DEFAULT_CAPACITY);
 
     gfSizes = alloc_and_zero_mem (gfSizesCapacity*sizeof(__int64));

@@ -7,13 +7,9 @@
     #error "You need to define UNICODE for this app to compile correctly"
 #endif
 
-// assume we have at least this # of items, to make it easier
+// make a "reservation" for this # of items, to make it easier
 // for the list
 #define LV_DEFAULT_CAPACITY 50000
-
-// set a limit for how many folders we process
-// let's say about 8 million :-)
-#define MAX_ITEMS       0x7fffff
 
 // how many "folder in folder" levels
 #define MAX_DEPTH       96

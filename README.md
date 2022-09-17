@@ -27,7 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 It's designed to take a single folder path from command line and
 go recursively from there to calculate total and subfolder size,
-presenting a list with all of them.
+presenting a list with all of them. If no start folder is specified,
+it uses the folder it was executed from.
 
 The console version takes a maximum "depth" (folder-in-folder) as
 a second optional parameter.
