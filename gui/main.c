@@ -225,9 +225,8 @@ int APIENTRY wWinMain ( HINSTANCE hInstance, HINSTANCE hPrevInstance,
         }
     }
 
-    // make initial capacity equal to list capacity, aligned
-    // to 4k boundaries
-    gfSizesCapacity = ALIGN_4K(LV_DEFAULT_CAPACITY);
+    // make initial capacity equal to list capacity
+    gfSizesCapacity = LV_DEFAULT_CAPACITY;
 
     gfSizes = alloc_and_zero_mem (gfSizesCapacity*sizeof(__int64));
 
@@ -471,11 +470,11 @@ __int64 FolderSize ( const WCHAR * fpath, THREAD_DATA * ptd )
         depth = MAX_DEPTH+10;
 
     // see if we reached the end of our current table, calculate the
-    // new size alligned to 4k and realloc accordingly
+    // new size and realloc accordingly
     if ( subfolders >= gfSizesCapacity - 1 )
     {
-        gfSizesCapacity += ALIGN_4K (( LV_DEFAULT_CAPACITY + 
-                (subfolders - gfSizesCapacity - 1)));
+        gfSizesCapacity += (LV_DEFAULT_CAPACITY + 
+                (subfolders - gfSizesCapacity - 1));
 
         tmpptr = realloc_and_zero_mem ( ptd->fsizes, 
             gfSizesCapacity*sizeof (__int64));
