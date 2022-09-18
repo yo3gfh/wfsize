@@ -7,6 +7,10 @@
     #error "You need to define UNICODE for this app to compile correctly"
 #endif
 
+#if !defined(WM_DPICHANGED)
+    #define WM_DPICHANGED 0x02E0
+#endif
+
 // make a "reservation" for this # of items, to make it easier
 // for the list
 #define LV_DEFAULT_CAPACITY 50000

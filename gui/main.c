@@ -81,6 +81,11 @@ typedef struct _fsize_thread_data
 } THREAD_DATA;
 
 // function prototypes
+
+typedef HRESULT (WINAPI *PGetDpiForMonitor)(HMONITOR hmonitor, 
+    int dpiType, UINT* dpiX, UINT* dpiY);
+
+WORD GetWindowDPI ( HWND hWnd );
 WCHAR ** FILE_CommandLineToArgv ( WCHAR * CmdLine, int * _argc );
 INT_PTR CALLBACK MainDlgProc ( HWND, UINT, WPARAM, LPARAM );
 BOOL IsDotOrTwoDots ( const WCHAR * src );
@@ -117,6 +122,7 @@ UINT        gTid;                       // worker thread id
 UINT_PTR    gThandle;                   // worker thread handle
 BOOL        gThreadWorking = FALSE;     // flag for the worker thread
 BOOL        gAscending = TRUE;          // for sorting
+WORD        gDpi;                       // holds current monitor DPI
 
 THREAD_DATA gTtd;                       // structure to pass data to and
                                         // from the worker thread
@@ -267,6 +273,12 @@ INT_PTR CALLBACK MainDlgProc ( HWND hwndDlg, UINT uMsg,
 {
     switch ( uMsg )
     {
+        // react to monitor DPI change
+        // https://building.enlyze.com/posts/writing-win32-apps-like-its-2020-part-3/
+        case WM_DPICHANGED:
+            gDpi = LOWORD ( wParam );
+            break;
+
         // pass WM_NOTIFY for further processing (column header click?)
         case WM_NOTIFY:
 
@@ -1053,9 +1065,14 @@ BOOL MainDLG_OnENDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 BOOL MainDLG_OnINITDIALOG ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 /*--------------------------------------------------------------------------*/
 {
+    WCHAR tmp[512];
+
     SetWindowTextW ( hWnd, app_name_ex );
 
     ghList = GetDlgItem ( hWnd, IDC_FLIST );
+    gDpi = GetWindowDPI ( hWnd );
+    StringCchPrintfW ( tmp, ARRAYSIZE(tmp), L"dpi=%u", gDpi );
+    MessageBoxW ( hWnd, tmp, L"DPI", MB_OK );
 
     if ( ghList != NULL )
     {
@@ -1416,4 +1433,45 @@ BOOL PathFromModule ( WCHAR * buf, DWORD cchDest )
     buf[len] = L'\0';
 
     return TRUE;
+}
+
+WORD GetWindowDPI ( HWND hWnd )
+{
+    HMODULE             hShcore;
+    PGetDpiForMonitor   pGetDpiForMonitor;
+    HMONITOR            hMonitor;
+    UINT                uiDpiX;
+    UINT                uiDpiY;
+    HRESULT             hr;
+    HDC                 hScreenDC;
+    int                 iDpiX;
+
+    // Try to get the DPI setting for the monitor where the given window is located.
+    // This API is Windows 8.1+.
+    hShcore = LoadLibraryW(L"shcore");
+
+    if ( hShcore )
+    {
+        pGetDpiForMonitor = (PGetDpiForMonitor)
+            (GetProcAddress(hShcore, "GetDpiForMonitor"));
+
+        if ( pGetDpiForMonitor )
+        {
+            hMonitor = MonitorFromWindow ( hWnd, MONITOR_DEFAULTTOPRIMARY );
+            hr = pGetDpiForMonitor ( hMonitor, 0, &uiDpiX, &uiDpiY );
+
+            if (SUCCEEDED(hr))
+            {
+                return (WORD)(uiDpiX);
+            }
+        }
+    }
+
+    // We couldn't get the window's DPI above, so get the DPI of the primary monitor
+    // using an API that is available in all Windows versions.
+    hScreenDC = GetDC(0);
+    iDpiX = GetDeviceCaps ( hScreenDC, LOGPIXELSX );
+    ReleaseDC(0, hScreenDC);
+
+    return (WORD)(iDpiX);
 }
