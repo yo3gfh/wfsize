@@ -109,6 +109,7 @@ BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam );
 BOOL MainDLG_OnENDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam );
 BOOL MainDLG_OnINITDIALOG ( HWND hWnd, WPARAM wParam, LPARAM lParam );
 BOOL MainDLG_OnNOTIFY ( HWND hWnd, WPARAM wParam, LPARAM lParam );
+BOOL MainDLG_OnDPICHANGED ( HWND hWnd, WPARAM wParam, LPARAM lParam );
 BOOL PathFromModule ( WCHAR * buf, DWORD cchDest );
 
 //
@@ -274,10 +275,9 @@ INT_PTR CALLBACK MainDlgProc ( HWND hwndDlg, UINT uMsg,
     switch ( uMsg )
     {
         // react to monitor DPI change
-        // https://building.enlyze.com/posts/writing-win32-apps-like-its-2020-part-3/
         case WM_DPICHANGED:
-            gDpi = LOWORD ( wParam );
-            break;
+            MainDLG_OnDPICHANGED ( hwndDlg, wParam, lParam );
+            return TRUE;
 
         // pass WM_NOTIFY for further processing (column header click?)
         case WM_NOTIFY:
@@ -664,7 +664,8 @@ WCHAR ** FILE_CommandLineToArgv ( WCHAR * CmdLine, int * _argc )
 //         AUTHOR: Adrian Petrila, YO3GFH
 //           DATE: 10.09.2022
 //    DESCRIPTION: called by EnumChildWindows on WM_SIZE, in order to 
-//                 reposition and resize controls. 
+//                 reposition and resize controls. Values are scaled 
+//                 with respect to current display dpi. 
 /*--------------------------------------------------------------------@@-@@-*/
 BOOL CALLBACK EnumChildProc ( HWND hwndChild, LPARAM lParam )
 /*--------------------------------------------------------------------------*/
@@ -684,41 +685,53 @@ BOOL CALLBACK EnumChildProc ( HWND hwndChild, LPARAM lParam )
     {
         // top status label
         case IDC_FLABEL:
-            newWidth = rcParent->right - (8+70);
-            newHeight = 50;
+            newWidth = rcParent->right - MulDiv((8+70),gDpi,DEFAULT_DPI);
+            newHeight = MulDiv(50,gDpi,DEFAULT_DPI);
 
-            MoveWindow ( hwndChild, 70, 8, newWidth, newHeight, TRUE );
+            MoveWindow ( hwndChild, MulDiv(70,gDpi,DEFAULT_DPI), 
+                MulDiv(8,gDpi,DEFAULT_DPI), newWidth, newHeight, TRUE );
+
             ShowWindow ( hwndChild, SW_SHOW );
             break;
 
         // break op. button
         case IDC_BREAKOP:
-            newLeft = rcParent->right - (120 + BNWIDTH);
-            newTop = rcParent->bottom - (13 + BNHEIGHT);
+            newLeft = rcParent->right - MulDiv((120 + BNWIDTH),
+                gDpi,DEFAULT_DPI);
+
+            newTop = rcParent->bottom - MulDiv((13 + BNHEIGHT),
+                gDpi,DEFAULT_DPI);
 
             MoveWindow ( hwndChild, newLeft, newTop, 
-                BNWIDTH, BNHEIGHT, TRUE );
+                MulDiv(BNWIDTH,gDpi,DEFAULT_DPI), 
+                    MulDiv(BNHEIGHT,gDpi,DEFAULT_DPI), TRUE );
 
             ShowWindow ( hwndChild, SW_SHOW );
             break;
 
         // close btn.
         case IDOK:
-            newLeft = rcParent->right - (13 + BNWIDTH);
-            newTop = rcParent->bottom - (13 + BNHEIGHT);
+            newLeft = rcParent->right - MulDiv((13 + BNWIDTH),
+                gDpi,DEFAULT_DPI);
+
+            newTop = rcParent->bottom - MulDiv((13 + BNHEIGHT),
+                gDpi,DEFAULT_DPI);
 
             MoveWindow ( hwndChild, newLeft, newTop, 
-                BNWIDTH, BNHEIGHT, TRUE );
+                MulDiv(BNWIDTH,gDpi,DEFAULT_DPI), MulDiv(BNHEIGHT,
+                    gDpi,DEFAULT_DPI), TRUE );
 
             ShowWindow ( hwndChild, SW_SHOW );
             break;
 
         // listview
         case IDC_FLIST:
-            newWidth = rcParent->right - (2*8);
-            newHeight = rcParent->bottom - (65+50);
+            newWidth = rcParent->right - (2*MulDiv(8,gDpi,DEFAULT_DPI));
+            newHeight = rcParent->bottom - MulDiv((65+50),gDpi,DEFAULT_DPI);
 
-            MoveWindow ( hwndChild, 8, 65, newWidth, newHeight, TRUE );
+            MoveWindow ( hwndChild, MulDiv(8,gDpi,DEFAULT_DPI), 
+                MulDiv(65,gDpi,DEFAULT_DPI), newWidth, newHeight, TRUE );
+
             ShowWindow ( hwndChild, SW_SHOW );
             break;
         
@@ -802,62 +815,66 @@ BOOL MainDLG_OnCOMMAND ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 BOOL MainDLG_OnSIZING ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 /*--------------------------------------------------------------------------*/
 {
-    RECT * wr;
+    RECT    * wr;
+    int     ww, wh;
 
     wr = (RECT *)lParam;
 
     if ( wr != NULL )
     {
+        ww = MulDiv(WWIDTH,gDpi,DEFAULT_DPI);
+        wh = MulDiv(WHEIGHT,gDpi,DEFAULT_DPI);
+
         switch ( wParam )
         {
             // sides
             case WMSZ_BOTTOM:
-                if ( wr->bottom - wr->top < WHEIGHT )
-                    wr->bottom = wr->top + WHEIGHT;
+                if ( wr->bottom - wr->top < wh )
+                    wr->bottom = wr->top + wh;
                 break;
 
             case WMSZ_TOP:
-                if ( wr->bottom - wr->top < WHEIGHT )
-                    wr->top = wr->bottom - WHEIGHT;
+                if ( wr->bottom - wr->top < wh )
+                    wr->top = wr->bottom - wh;
                 break;
 
             case WMSZ_LEFT:
-                if ( wr->right - wr->left < WWIDTH )
-                    wr->left = wr->right - WWIDTH;
+                if ( wr->right - wr->left < ww )
+                    wr->left = wr->right - ww;
                 break;
 
             case WMSZ_RIGHT:
-                if ( wr->right - wr->left < WWIDTH )
-                    wr->right = wr->left + WWIDTH;
+                if ( wr->right - wr->left < ww )
+                    wr->right = wr->left + ww;
                 break;
 
             // corners
             case WMSZ_BOTTOMLEFT:
-                if ( wr->bottom - wr->top < WHEIGHT )
-                    wr->bottom = wr->top + WHEIGHT;
-                if ( wr->right - wr->left < WWIDTH )
-                    wr->left = wr->right - WWIDTH;
+                if ( wr->bottom - wr->top < wh )
+                    wr->bottom = wr->top + wh;
+                if ( wr->right - wr->left < ww )
+                    wr->left = wr->right - ww;
                 break;
 
             case WMSZ_BOTTOMRIGHT:
-                if ( wr->bottom - wr->top < WHEIGHT )
-                    wr->bottom = wr->top + WHEIGHT;
-                if ( wr->right - wr->left < WWIDTH )
-                    wr->right = wr->left + WWIDTH;
+                if ( wr->bottom - wr->top < wh )
+                    wr->bottom = wr->top + wh;
+                if ( wr->right - wr->left < ww )
+                    wr->right = wr->left + ww;
                 break;
 
             case WMSZ_TOPLEFT:
-                if ( wr->bottom - wr->top < WHEIGHT )
-                    wr->top = wr->bottom - WHEIGHT;
-                if ( wr->right - wr->left < WWIDTH )
-                    wr->left = wr->right - WWIDTH;
+                if ( wr->bottom - wr->top < wh )
+                    wr->top = wr->bottom - wh;
+                if ( wr->right - wr->left < ww )
+                    wr->left = wr->right - ww;
                 break;
 
             case WMSZ_TOPRIGHT:
-                if ( wr->bottom - wr->top < WHEIGHT )
-                    wr->top = wr->bottom - WHEIGHT;
-                if ( wr->right - wr->left < WWIDTH )
-                    wr->right = wr->left + WWIDTH;
+                if ( wr->bottom - wr->top < wh )
+                    wr->top = wr->bottom - wh;
+                if ( wr->right - wr->left < ww )
+                    wr->right = wr->left + ww;
                 break;
 
             default:
@@ -1065,14 +1082,12 @@ BOOL MainDLG_OnENDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 BOOL MainDLG_OnINITDIALOG ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 /*--------------------------------------------------------------------------*/
 {
-    WCHAR tmp[512];
-
     SetWindowTextW ( hWnd, app_name_ex );
 
-    ghList = GetDlgItem ( hWnd, IDC_FLIST );
-    gDpi = GetWindowDPI ( hWnd );
-    StringCchPrintfW ( tmp, ARRAYSIZE(tmp), L"dpi=%u", gDpi );
-    MessageBoxW ( hWnd, tmp, L"DPI", MB_OK );
+    ghList  = GetDlgItem ( hWnd, IDC_FLIST );
+    
+    // save current display DPI for later
+    gDpi    = GetWindowDPI ( hWnd ); 
 
     if ( ghList != NULL )
     {
@@ -1371,7 +1386,7 @@ BOOL LVItemsToCSV ( HWND hList, const WCHAR * fname )
     if ( hFile == INVALID_HANDLE_VALUE )
         return FALSE;
 
-    for ( i = 0; i < items && i < gfSizesCapacity; i++ )
+    for ( i = 0; i < items; i++ )
     {
         item[0]         = L'\0';
         subitem[0]      = L'\0';
@@ -1429,13 +1444,26 @@ BOOL PathFromModule ( WCHAR * buf, DWORD cchDest )
     // hit the first path separator (from end to start)
     while ( buf[len] != L'\\' )
         len--;
+
     // and end the string here
     buf[len] = L'\0';
 
     return TRUE;
 }
 
+/*-@@+@@--------------------------------------------------------------------*/
+//       Function: GetWindowDPI 
+/*--------------------------------------------------------------------------*/
+//           Type: WORD 
+//    Param.    1: HWND hWnd : window to get DPI for
+/*--------------------------------------------------------------------------*/
+//         AUTHOR: Colin Finck, Adrian Petrila, YO3GFH
+//           DATE: 18.09.2022
+//    DESCRIPTION: thanks to Colin Finck for the blog post, very nice article
+// https://building.enlyze.com/posts/writing-win32-apps-like-its-2020-part-3/
+/*--------------------------------------------------------------------@@-@@-*/
 WORD GetWindowDPI ( HWND hWnd )
+/*--------------------------------------------------------------------------*/
 {
     HMODULE             hShcore;
     PGetDpiForMonitor   pGetDpiForMonitor;
@@ -1446,14 +1474,14 @@ WORD GetWindowDPI ( HWND hWnd )
     HDC                 hScreenDC;
     int                 iDpiX;
 
-    // Try to get the DPI setting for the monitor where the given window is located.
-    // This API is Windows 8.1+.
-    hShcore = LoadLibraryW(L"shcore");
+    // Try to get the DPI setting for the monitor where the given 
+    // window is located. This API is Windows 8.1+.
+    hShcore = LoadLibraryW ( L"shcore" );
 
     if ( hShcore )
     {
-        pGetDpiForMonitor = (PGetDpiForMonitor)
-            (GetProcAddress(hShcore, "GetDpiForMonitor"));
+        pGetDpiForMonitor = ( PGetDpiForMonitor )
+            ( GetProcAddress ( hShcore, "GetDpiForMonitor" ) );
 
         if ( pGetDpiForMonitor )
         {
@@ -1467,11 +1495,49 @@ WORD GetWindowDPI ( HWND hWnd )
         }
     }
 
-    // We couldn't get the window's DPI above, so get the DPI of the primary monitor
-    // using an API that is available in all Windows versions.
+    // We couldn't get the window's DPI above, so get the DPI of the primary 
+    // monitor using an API that is available in all Windows versions.
     hScreenDC = GetDC(0);
     iDpiX = GetDeviceCaps ( hScreenDC, LOGPIXELSX );
-    ReleaseDC(0, hScreenDC);
+    ReleaseDC ( 0, hScreenDC );
 
     return (WORD)(iDpiX);
+}
+
+/*-@@+@@--------------------------------------------------------------------*/
+//       Function: MainDLG_OnDPICHANGED 
+/*--------------------------------------------------------------------------*/
+//           Type: BOOL 
+//    Param.    1: HWND hWnd     : 
+//    Param.    2: WPARAM wParam : 
+//    Param.    3: LPARAM lParam : 
+/*--------------------------------------------------------------------------*/
+//         AUTHOR: Adrian Petrila, YO3GFH
+//           DATE: 18.09.2022
+//    DESCRIPTION: handler for WM_DPICHANGED - sent when display res has 
+//                 changed. Update our global var and resize window to 
+//                 recommended values.
+/*--------------------------------------------------------------------@@-@@-*/
+BOOL MainDLG_OnDPICHANGED ( HWND hWnd, WPARAM wParam, LPARAM lParam )
+/*--------------------------------------------------------------------------*/
+{
+    // window coords
+    int     wx, wy, ww, wh;
+    RECT    * r;
+
+    gDpi = LOWORD ( wParam );
+    r = (RECT *)lParam;    
+
+    if ( r == NULL )
+        return FALSE;
+
+    wx = r->left;
+    wy = r->top;
+    ww = r->right - r->left;
+    wh = r->bottom - r->top;
+
+    // make window dimensions bigger by 1 px to
+    // trigger a WM_SIZE and scale all children
+    return SetWindowPos ( hWnd, NULL, wx, wy, ww+1, wh+1, 
+        SWP_NOZORDER | SWP_NOACTIVATE);
 }

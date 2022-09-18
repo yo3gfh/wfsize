@@ -11,6 +11,9 @@
     #define WM_DPICHANGED 0x02E0
 #endif
 
+// default settings for display res
+#define DEFAULT_DPI     96
+
 // make a "reservation" for this # of items, to make it easier
 // for the list
 #define LV_DEFAULT_CAPACITY 50000
