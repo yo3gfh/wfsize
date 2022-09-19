@@ -1,6 +1,9 @@
 #ifndef MAIN_H
 #define MAIN_H
 
+// define LV_FAST_UPDATE to make folder crawling work faster
+// (about 3 times) on the expense of realtime list updating 
+//#define LV_FAST_UPDATE
 #define UNICODE
 
 #ifndef UNICODE
@@ -20,15 +23,6 @@
 
 // how many "folder in folder" levels
 #define MAX_DEPTH       96
-
-// app window size, change these if reworking dlg resource
-// note: they are in pixels, not dlg units!
-#define WWIDTH          937
-#define WHEIGHT         402
-
-// buttons size, same as above
-#define BNWIDTH         98
-#define BNHEIGHT        23
 
 // private thread messages
 #define WM_ENDFSIZE     WM_APP + 1      // end op.

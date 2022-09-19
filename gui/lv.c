@@ -11,6 +11,41 @@
 // listview management functions
 //
 
+
+/*-@@+@@--------------------------------------------------------------------*/
+//       Function: BeginDraw 
+/*--------------------------------------------------------------------------*/
+//           Type: void 
+//    Param.    1: HWND hwnd : handle to window
+/*--------------------------------------------------------------------------*/
+//         AUTHOR: Adrian Petrila, YO3GFH
+//           DATE: 28.09.2020
+//    DESCRIPTION: Mark the beginning of a lengthy operation. Use before some
+//                 long updates in a list, edit control etc. to avoid flicker
+/*--------------------------------------------------------------------@@-@@-*/
+void BeginDraw ( HWND hwnd )
+/*--------------------------------------------------------------------------*/
+{
+    SendMessage ( hwnd, WM_SETREDRAW, FALSE, 0 );
+}
+
+/*-@@+@@--------------------------------------------------------------------*/
+//       Function: EndDraw 
+/*--------------------------------------------------------------------------*/
+//           Type: void 
+//    Param.    1: HWND hwnd : HWND to window
+/*--------------------------------------------------------------------------*/
+//         AUTHOR: Adrian Petrila, YO3GFH
+//           DATE: 28.09.2020
+//    DESCRIPTION: Mark the end of a lengthy operation. Generates a repaint
+/*--------------------------------------------------------------------@@-@@-*/
+void EndDraw ( HWND hwnd )
+/*--------------------------------------------------------------------------*/
+{
+    SendMessage ( hwnd, WM_SETREDRAW, TRUE, 0 );
+    InvalidateRect ( hwnd, NULL, TRUE );
+}
+ 
 /*-@@+@@--------------------------------------------------------------------*/
 //       Function: LVInsertColumn 
 /*--------------------------------------------------------------------------*/

@@ -27,6 +27,8 @@ void    LVUnselectItem      ( HWND hList, int index );
 BOOL    LVEnsureVisible     ( HWND hList, int index );
 BOOL    LVSortItems         ( HWND hList, WPARAM wParam, LPARAM lParam );
 BOOL    LVSetHeaderSortImg  ( HWND hList, int index, LV_ARROW lvArrow );
+void    BeginDraw           ( HWND hList );
+void    EndDraw             ( HWND hList );
 
 int LVInsertColumn 
     ( HWND hList, int nCol, const WCHAR * lpszColumnHeading, 

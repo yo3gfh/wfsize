@@ -116,6 +116,8 @@ BOOL PathFromModule ( WCHAR * buf, DWORD cchDest );
 // globals
 //
 
+int         gwWidth, gwHeight;          // hold window width and height
+int         gbnWidth, gbnHeight;        // hold button width and height
 HANDLE      ghInstance;
 HWND        ghList;                     // listview hwnd
 WCHAR       grootDir[1024];             // passed from cmdline
@@ -303,6 +305,9 @@ INT_PTR CALLBACK MainDlgProc ( HWND hwndDlg, UINT uMsg,
 
                     PostThreadMessage ( gTid, WM_ABTFSIZE, 0, 0 );
                     EnableWindow ( GetDlgItem ( hwndDlg, IDC_BREAKOP ), FALSE);
+                    #ifdef LV_FAST_UPDATE
+                        EndDraw ( ghList );
+                    #endif
                     LVEnsureVisible ( ghList, LVGetCount ( ghList ) - 1 );
                     LVSelectItem ( ghList, LVGetCount ( ghList ) - 1 );
                     SetFocus ( ghList );
@@ -695,29 +700,29 @@ BOOL CALLBACK EnumChildProc ( HWND hwndChild, LPARAM lParam )
 
         // break op. button
         case IDC_BREAKOP:
-            newLeft = rcParent->right - MulDiv((120 + BNWIDTH),
+            newLeft = rcParent->right - MulDiv((120 + gbnWidth),
                 gDpi,DEFAULT_DPI);
 
-            newTop = rcParent->bottom - MulDiv((13 + BNHEIGHT),
+            newTop = rcParent->bottom - MulDiv((13 + gbnHeight),
                 gDpi,DEFAULT_DPI);
 
             MoveWindow ( hwndChild, newLeft, newTop, 
-                MulDiv(BNWIDTH,gDpi,DEFAULT_DPI), 
-                    MulDiv(BNHEIGHT,gDpi,DEFAULT_DPI), TRUE );
+                MulDiv(gbnWidth,gDpi,DEFAULT_DPI), 
+                    MulDiv(gbnHeight,gDpi,DEFAULT_DPI), TRUE );
 
             ShowWindow ( hwndChild, SW_SHOW );
             break;
 
         // close btn.
         case IDOK:
-            newLeft = rcParent->right - MulDiv((13 + BNWIDTH),
+            newLeft = rcParent->right - MulDiv((13 + gbnWidth),
                 gDpi,DEFAULT_DPI);
 
-            newTop = rcParent->bottom - MulDiv((13 + BNHEIGHT),
+            newTop = rcParent->bottom - MulDiv((13 + gbnHeight),
                 gDpi,DEFAULT_DPI);
 
             MoveWindow ( hwndChild, newLeft, newTop, 
-                MulDiv(BNWIDTH,gDpi,DEFAULT_DPI), MulDiv(BNHEIGHT,
+                MulDiv(gbnWidth,gDpi,DEFAULT_DPI), MulDiv(gbnHeight,
                     gDpi,DEFAULT_DPI), TRUE );
 
             ShowWindow ( hwndChild, SW_SHOW );
@@ -725,7 +730,7 @@ BOOL CALLBACK EnumChildProc ( HWND hwndChild, LPARAM lParam )
 
         // listview
         case IDC_FLIST:
-            newWidth = rcParent->right - (2*MulDiv(8,gDpi,DEFAULT_DPI));
+            newWidth = rcParent->right - (MulDiv(8+8,gDpi,DEFAULT_DPI));
             newHeight = rcParent->bottom - MulDiv((65+50),gDpi,DEFAULT_DPI);
 
             MoveWindow ( hwndChild, MulDiv(8,gDpi,DEFAULT_DPI), 
@@ -783,6 +788,9 @@ BOOL MainDLG_OnCOMMAND ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 
                 PostThreadMessage ( gTid, WM_ABTFSIZE, 0, 0 );
                 EnableWindow ( GetDlgItem ( hWnd, IDC_BREAKOP ), FALSE );
+                #ifdef LV_FAST_UPDATE
+                    EndDraw ( ghList );
+                #endif
                 LVEnsureVisible ( ghList, LVGetCount ( ghList ) - 1 );
                 LVSelectItem ( ghList, LVGetCount ( ghList ) - 1 );
                 SetFocus ( ghList );
@@ -821,8 +829,8 @@ BOOL MainDLG_OnSIZING ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 
     if ( wr != NULL )
     {
-        ww = MulDiv(WWIDTH,gDpi,DEFAULT_DPI);
-        wh = MulDiv(WHEIGHT,gDpi,DEFAULT_DPI);
+        ww = MulDiv(gwWidth,gDpi,DEFAULT_DPI);
+        wh = MulDiv(gwHeight,gDpi,DEFAULT_DPI);
 
         switch ( wParam )
         {
@@ -931,10 +939,10 @@ BOOL MainDLG_OnSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 /*--------------------------------------------------------------------------*/
 {
-    THREAD_DATA     * ptd;
-    WCHAR           f[1024];
-    WCHAR           s[128];
-    UINT_PTR        index;
+    THREAD_DATA         * ptd;
+    WCHAR               f[1024];
+    WCHAR               s[1024];
+    static UINT_PTR     index;
 
     ptd = (THREAD_DATA *)lParam;
 
@@ -946,8 +954,6 @@ BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
         // format the number with the default thousand separator
         GetNumberFormatW ( LOCALE_SYSTEM_DEFAULT, 
             LOCALE_NOUSEROVERRIDE, f, NULL, s, ARRAYSIZE(s) );
-
-        index = LVGetCount ( ptd->hList );
 
         // add result to the list and store index to folder size 
         // in the list as lParam member of LVITEM struct so we can sort 
@@ -971,14 +977,18 @@ BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 
         // from time to time, update total folders and scroll list
         // into view
-        if ( ptd->subfolders % 256 == 0 )
+        if ( index % 256 == 0 )
         {
             StringCchPrintfW ( f, ARRAYSIZE(f), L"%ls (%zu subfolders "
                 "processed)", grootDir, ptd->subfolders );
 
             SetDlgItemTextW ( hWnd, IDC_FLABEL, f );
-            LVEnsureVisible ( ptd->hList, index );
+            #ifndef LV_FAST_UPDATE
+                LVEnsureVisible ( ptd->hList, index );
+            #endif
         }
+
+        index++;
     }
 
     return TRUE;
@@ -1042,7 +1052,9 @@ BOOL MainDLG_OnENDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
         min  = st_result.wMinute;
         sec  = st_result.wSecond;
         msec = st_result.wMilliseconds;
-
+        #ifdef LV_FAST_UPDATE
+            EndDraw ( ptd->hList );
+        #endif
         LVEnsureVisible ( ptd->hList, LVGetCount ( ptd->hList ) - 1 );
         LVSelectItem ( ptd->hList, LVGetCount ( ptd->hList ) - 1 );
         SetFocus ( ptd->hList );
@@ -1081,12 +1093,23 @@ BOOL MainDLG_OnENDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 BOOL MainDLG_OnINITDIALOG ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 /*--------------------------------------------------------------------------*/
 {
+    RECT    wr;
+
     SetWindowTextW ( hWnd, app_name_ex );
 
     ghList  = GetDlgItem ( hWnd, IDC_FLIST );
     
     // save current display DPI for later
-    gDpi    = GetWindowDPI ( hWnd ); 
+    gDpi    = GetWindowDPI ( hWnd );
+
+    // save window width and height
+    GetWindowRect ( hWnd, &wr );
+    gwWidth = wr.right - wr.left;
+    gwHeight = wr.bottom - wr.top;
+
+    GetWindowRect ( GetDlgItem ( hWnd, IDC_BREAKOP ), &wr );
+    gbnWidth = wr.right - wr.left;
+    gbnHeight = wr.bottom - wr.top;
 
     if ( ghList != NULL )
     {
@@ -1111,7 +1134,12 @@ BOOL MainDLG_OnINITDIALOG ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 
             SendMessage ( ghList, LVM_SETITEMCOUNT, LV_DEFAULT_CAPACITY, 0 );
             EnableWindow ( GetDlgItem ( hWnd, IDC_BREAKOP ), TRUE );
-
+            
+            // disable listview updates - faster execution
+            // but disables realtime feedback
+            #ifdef LV_FAST_UPDATE
+                BeginDraw ( ghList );
+            #endif
             // punch the clock
             GetLocalTime ( &gTimeStart );
 
