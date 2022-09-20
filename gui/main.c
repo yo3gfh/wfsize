@@ -77,7 +77,8 @@ typedef struct _fsize_thread_data
     __int64     size;       // crt. folder size
     __int64     * fsizes;   // always holds the correct fsize table address
     UINT        errcode;    // unused
-    UINT_PTR    subfolders; // how many subfolders processed          
+    UINT_PTR    subfolders; // how many subfolders processed
+    UINT_PTR    files;      // how many files processed        
 } THREAD_DATA;
 
 // function prototypes
@@ -414,6 +415,7 @@ __int64 FolderSize ( const WCHAR * fpath, THREAD_DATA * ptd )
     __int64             * tmpptr;
     static UINT_PTR     depth;
     static UINT_PTR     subfolders;
+    static UINT_PTR     files;
     WCHAR               buf[1024];
     WCHAR               tmp[1024];
     LARGE_INTEGER       li;
@@ -458,6 +460,7 @@ __int64 FolderSize ( const WCHAR * fpath, THREAD_DATA * ptd )
                 li.u.HighPart = ffData.nFileSizeHigh;
                 li.u.LowPart = ffData.nFileSizeLow;
                 size += li.QuadPart;
+                files++;
             }
         }
 
@@ -494,6 +497,7 @@ __int64 FolderSize ( const WCHAR * fpath, THREAD_DATA * ptd )
     ptd->size       = size;
     ptd->crtDir     = tmp;
     ptd->subfolders = subfolders;
+    ptd->files      = files;
 
     // ...and signal main thread that we have data
     // please don't use PostMessage, unless you worship Satan 8-)
@@ -979,8 +983,9 @@ BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
         // into view
         if ( index % 256 == 0 )
         {
-            StringCchPrintfW ( f, ARRAYSIZE(f), L"%ls (%zu subfolders "
-                "processed)", grootDir, ptd->subfolders );
+            StringCchPrintfW ( f, ARRAYSIZE(f), L"%ls (%zu subfolders, "
+                "%zu files processed)", grootDir, 
+                    ptd->subfolders, ptd->files );
 
             SetDlgItemTextW ( hWnd, IDC_FLABEL, f );
             #ifndef LV_FAST_UPDATE
@@ -1065,9 +1070,10 @@ BOOL MainDLG_OnENDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
         GetNumberFormatW ( LOCALE_SYSTEM_DEFAULT, 
             LOCALE_NOUSEROVERRIDE, f, NULL, s, ARRAYSIZE(s) );
 
-        StringCchPrintfW ( f, ARRAYSIZE(f), L"%ls (%zu subfolders,"
-            " %02uh:%02um:%02us:%03ums), %ls KBytes total size", grootDir, 
-                ptd->subfolders, hr, min, sec, msec, s );
+        StringCchPrintfW ( f, ARRAYSIZE(f), L"%ls (%zu subfolders, "
+            "%zu files, %02uh:%02um:%02us:%03ums), %ls KBytes total size", 
+                grootDir, ptd->subfolders, ptd->files, 
+                    hr, min, sec, msec, s );
 
         SetDlgItemTextW ( hWnd, IDC_FLABEL, f );
     }
