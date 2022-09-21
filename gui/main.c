@@ -1177,7 +1177,6 @@ BOOL MainDLG_OnNOTIFY ( HWND hWnd, WPARAM wParam, LPARAM lParam )
     NMHDR           * lpnm;
     NMLVKEYDOWN     * lpvk;
     HWND            hList;
-    static BOOL     ctrl_pressed, s_pressed;
 
     lpnm = (NMHDR *)lParam;
 
@@ -1213,36 +1212,28 @@ BOOL MainDLG_OnNOTIFY ( HWND hWnd, WPARAM wParam, LPARAM lParam )
                 ContextMenu ( hWnd, IDR_LPOP );
                 break;
 
-            // a crude ctrl+s simulation
+            // check for ctrl+something
             case LVN_KEYDOWN:
                 lpvk = (NMLVKEYDOWN *)lParam;
                 switch ( lpvk->wVKey )
                 {
-                    case VK_CONTROL:
-                        ctrl_pressed = TRUE;
+                    case VK_Q:
+                        // quit
+                        if (GetKeyState(VK_CONTROL) < 0)
+                            EndDialog ( hWnd, TRUE );
                         break;
 
                     case VK_S:
-                        if ( ctrl_pressed )
-                            s_pressed = TRUE;
+                        if (GetKeyState(VK_CONTROL) < 0)
+                            if ( !SaveFolderListToCSV ( hWnd ) )
+                                MessageBoxW ( hWnd, L"Unable to save folder "
+                                    "list to CSV file!", app_name, 
+                                        MB_OK|MB_ICONEXCLAMATION);
                         break;
 
                     default:
-                        ctrl_pressed = FALSE;
-                        s_pressed = FALSE;
                         break;
                 } 
-
-                if ( ctrl_pressed && s_pressed )
-                {
-                    if ( !SaveFolderListToCSV ( hWnd ) )
-                        MessageBoxW ( hWnd, L"Unable to save folder "
-                            "list to CSV file!", app_name, 
-                                MB_OK|MB_ICONEXCLAMATION);
-                    
-                    ctrl_pressed = FALSE;
-                    s_pressed = FALSE;
-                }
                 break;
 
             default:
