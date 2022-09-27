@@ -22,7 +22,7 @@
 #define LV_DEFAULT_CAPACITY 50000
 
 // how many "folder in folder" levels
-#define MAX_DEPTH       96
+#define MAX_DEPTH       100
 
 // private thread messages
 #define WM_ENDFSIZE     WM_APP + 1      // end op.

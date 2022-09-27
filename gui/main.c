@@ -78,7 +78,9 @@ typedef struct _fsize_thread_data
     __int64     * fsizes;   // always holds the correct fsize table address
     UINT        errcode;    // unused
     UINT_PTR    subfolders; // how many subfolders processed
-    UINT_PTR    files;      // how many files processed        
+    UINT_PTR    files;      // how many files processed
+    UINT_PTR    depth;      // depth of recursion
+    UINT_PTR    index;      // used for indexing of fsizes table
 } THREAD_DATA;
 
 // function prototypes
@@ -135,7 +137,7 @@ size_t      gfSizesCapacity;            // will hold gfSizes current capacity
 __int64     * gfSizes;                  // pointer to int64 table that 
                                         // will hold ALL processed 
                                         // folders (gTtd.crtDir) size;
-                                        // pointers to each element from
+                                        // index of each element from
                                         // this table are stored in the  
                                         // coresponding list items data
                                         // struct
@@ -413,15 +415,12 @@ __int64 FolderSize ( const WCHAR * fpath, THREAD_DATA * ptd )
     HANDLE              hFind;
     __int64             size;
     __int64             * tmpptr;
-    static UINT_PTR     depth;
-    static UINT_PTR     subfolders;
-    static UINT_PTR     files;
     WCHAR               buf[1024];
     WCHAR               tmp[1024];
     LARGE_INTEGER       li;
     MSG                 msg;
 
-    if ( fpath == NULL )
+    if ( fpath == NULL || ptd == NULL )
         return 0;
 
     size = 0;
@@ -448,11 +447,11 @@ __int64 FolderSize ( const WCHAR * fpath, THREAD_DATA * ptd )
                     StringCchCopyW ( buf+lstrlenW(fpath)+1, 
                         ARRAYSIZE(buf), ffData.cFileName );
 
-                    depth++;
-                    subfolders++;
+                    ptd->depth++;
+                    ptd->subfolders++;
                     // do recursion!
                     size += FolderSize ( buf, ptd );
-                    depth--;
+                    ptd->depth--;
                 }
             }
             else // just files, add to total size
@@ -460,13 +459,13 @@ __int64 FolderSize ( const WCHAR * fpath, THREAD_DATA * ptd )
                 li.u.HighPart = ffData.nFileSizeHigh;
                 li.u.LowPart = ffData.nFileSizeLow;
                 size += li.QuadPart;
-                files++;
+                ptd->files++;
             }
         }
 
         // stop if max. level of folder imbrication reached
         while ( ( FindNextFile ( hFind, &ffData ) != 0 ) &&
-                  ( depth < MAX_DEPTH ) );
+                  ( ptd->depth < MAX_DEPTH ) );
     }
 
     FindClose ( hFind );
@@ -475,14 +474,14 @@ __int64 FolderSize ( const WCHAR * fpath, THREAD_DATA * ptd )
     // or WM_RAGEQUIT messages) and simulate a MAX_DEPTH
     // overflow to stop recursion
     if ( PeekMessage ( &msg, (HWND)-1, WM_APP+100, WM_APP+200, PM_REMOVE ) )
-        depth = MAX_DEPTH+10;
+        ptd->depth = MAX_DEPTH+10;
 
     // see if we reached the end of our current table, calculate the
     // new size and realloc accordingly
-    if ( subfolders >= gfSizesCapacity - 1 )
+    if ( ptd->subfolders >= gfSizesCapacity - 1 )
     {
         gfSizesCapacity += (LV_DEFAULT_CAPACITY + 
-                (subfolders - gfSizesCapacity - 1));
+                (ptd->subfolders - gfSizesCapacity - 1));
 
         tmpptr = realloc_and_zero_mem ( ptd->fsizes, 
             gfSizesCapacity*sizeof (__int64));
@@ -490,14 +489,12 @@ __int64 FolderSize ( const WCHAR * fpath, THREAD_DATA * ptd )
         if ( tmpptr != NULL )
             ptd->fsizes = tmpptr;
         else
-            depth = MAX_DEPTH+10; // can't go further so force eject
+            ptd->depth = MAX_DEPTH+10; // can't go further so force eject
     }
 
     // put results in our structure...
     ptd->size       = size;
     ptd->crtDir     = tmp;
-    ptd->subfolders = subfolders;
-    ptd->files      = files;
 
     // ...and signal main thread that we have data
     // please don't use PostMessage, unless you worship Satan 8-)
@@ -946,7 +943,6 @@ BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
     THREAD_DATA         * ptd;
     WCHAR               f[1024];
     WCHAR               s[1024];
-    static UINT_PTR     index;
 
     ptd = (THREAD_DATA *)lParam;
 
@@ -967,21 +963,21 @@ BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 
         __try
         {
-            gfSizes[index] = ptd->size;
+            gfSizes[ptd->index] = ptd->size;
         }
         __except ( EXCEPTION_EXECUTE_HANDLER )
         {
             return FALSE; // great booboo happened
         }
     
-        LVInsertItemEx ( ptd->hList, index, -1, ptd->crtDir, 
-            (LPARAM)index );
+        LVInsertItemEx ( ptd->hList, ptd->index, -1, ptd->crtDir, 
+            (LPARAM)(ptd->index) );
 
-        LVSetItemText ( ptd->hList, index, 1, s );
+        LVSetItemText ( ptd->hList, ptd->index, 1, s );
 
         // from time to time, update total folders and scroll list
         // into view
-        if ( index % 256 == 0 )
+        if ( ptd->index % 256 == 0 )
         {
             StringCchPrintfW ( f, ARRAYSIZE(f), L"%ls (%zu subfolders, "
                 "%zu files processed)", grootDir, 
@@ -989,11 +985,11 @@ BOOL MainDLG_OnUPDFSIZE ( HWND hWnd, WPARAM wParam, LPARAM lParam )
 
             SetDlgItemTextW ( hWnd, IDC_FLABEL, f );
             #ifndef LV_FAST_UPDATE
-                LVEnsureVisible ( ptd->hList, index );
+                LVEnsureVisible ( ptd->hList, ptd->index );
             #endif
         }
 
-        index++;
+        ptd->index++;
     }
 
     return TRUE;
@@ -1135,6 +1131,7 @@ BOOL MainDLG_OnINITDIALOG ( HWND hWnd, WPARAM wParam, LPARAM lParam )
             gTtd.hList      = ghList;
             gTtd.hParent    = hWnd;
             gTtd.fsizes     = gfSizes;
+            gTtd.index      = 0;
             
             gThreadWorking  = TRUE;
 
